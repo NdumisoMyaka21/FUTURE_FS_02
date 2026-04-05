@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Future Interns | Mini CRM - Task 2</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    body { font-family: 'Inter', sans-serif; background: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 1200px; margin: auto; background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; }
+    header { background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; padding: 25px; text-align: center; }
+    header h1 { margin: 0; font-size: 28px; }
+    .header-subtitle { margin: 5px 0 0; opacity: 0.9; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 14px 20px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f1f5f9; font-weight: 600; }
+    .status { padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
+    .New { background: #fefce8; color: #854d0e; }
+    .Contacted { background: #dbeafe; color: #1e40af; }
+    .Converted { background: #d1fae5; color: #166534; }
+    button { padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
+    .btn-primary { background: #1e3a8a; color: white; }
+    .btn-danger { background: #ef4444; color: white; }
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-content { background: white; padding: 30px; border-radius: 16px; width: 90%; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🚀 Future Interns - Mini CRM</h1>
+      <p class="header-subtitle">Task 2 | Client Lead Management System</p>
+    </header>
+
+    <div style="padding: 25px;">
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <button onclick="showAddModal()" class="btn-primary">+ Add New Lead</button>
+        <button onclick="logout()" class="btn-danger" style="margin-left:auto;">Logout (Admin)</button>
+      </div>
+
+      <table id="leadsTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Source</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add Lead Modal -->
+  <div class="modal" id="addModal">
+    <div class="modal-content">
+      <h2>Add New Lead</h2>
+      <input id="name" placeholder="Full Name" required>
+      <input id="email" type="email" placeholder="Email Address" required>
+      <input id="source" placeholder="Source (Website, LinkedIn, Referral...)" value="Website">
+      <button onclick="addLead()" class="btn-primary">Save Lead</button>
+      <button onclick="hideModals()" style="background:#64748b; color:white;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Lead Detail Modal -->
+  <div class="modal" id="detailModal">
+    <div class="modal-content">
+      <h2 id="modalName"></h2>
+      <p id="modalEmail" style="margin:5px 0 15px;"></p>
+      
+      <label>Status</label>
+      <select id="statusSelect" onchange="updateStatus()" style="margin-bottom:20px;"></select>
+      
+      <h3>Notes & Follow-ups</h3>
+      <div id="notesList" style="max-height:200px; overflow-y:auto; margin-bottom:15px;"></div>
+      
+      <textarea id="newNote" placeholder="Add a new note or follow-up..."></textarea>
+      <button onclick="addNote()" class="btn-primary">Add Note</button>
+      <button onclick="hideModals()" style="background:#64748b; color:white;">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:5000/api';
+
+    let currentLeadId = null;
+
+    async function loadLeads() {
+      const res = await fetch(`${API_BASE}/leads`);
+      const leads = await res.json();
+      const tbody = document.querySelector('#leadsTable tbody');
+      tbody.innerHTML = '';
+
+      leads.forEach(lead => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${lead.name}</strong></td>
+          <td>${lead.email}</td>
+          <td>${lead.source || '-'}</td>
+          <td><span class="status ${lead.status}">${lead.status}</span></td>
+          <td><button onclick="viewLead('${lead._id}')" class="btn-primary">View Details</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function addLead() {
+      const lead = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        source: document.getElementById('source').value
+      };
+
+      await fetch(`${API_BASE}/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lead)
+      });
+      hideModals();
+      loadLeads();
+    }
+
+    async function viewLead(id) {
+      currentLeadId = id;
+      const res = await fetch(`${API_BASE}/leads`);
+      const leads = await res.json();
+      const lead = leads.find(l => l._id === id);
+
+      document.getElementById('modalName').textContent = lead.name;
+      document.getElementById('modalEmail').textContent = lead.email;
+
+      const select = document.getElementById('statusSelect');
+      select.innerHTML = `
+        <option value="New" ${lead.status === 'New' ? 'selected' : ''}>New</option>
+        <option value="Contacted" ${lead.status === 'Contacted' ? 'selected' : ''}>Contacted</option>
+        <option value="Converted" ${lead.status === 'Converted' ? 'selected' : ''}>Converted</option>
+      `;
+
+      const notesDiv = document.getElementById('notesList');
+      notesDiv.innerHTML = lead.notes.map(n => `
+        <div style="background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:8px;">
+          <small>${new Date(n.date).toLocaleDateString('en-GB')}</small><br>
+          ${n.text}
+        </div>
+      `).join('');
+
+      document.getElementById('detailModal').style.display = 'flex';
+    }
+
+    async function updateStatus() {
+      const status = document.getElementById('statusSelect').value;
+      await fetch(`${API_BASE}/leads/${currentLeadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      viewLead(currentLeadId);
+    }
+
+    async function addNote() {
+      const noteText = document.getElementById('newNote').value.trim();
+      if (!noteText) return;
+
+      await fetch(`${API_BASE}/leads/${currentLeadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: noteText })
+      });
+      document.getElementById('newNote').value = '';
+      viewLead(currentLeadId);
+    }
+
+    function showAddModal() {
+      document.getElementById('addModal').style.display = 'flex';
+    }
+
+    function hideModals() {
+      document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+    }
+
+    function logout() {
+      if (confirm('Logout?')) {
+        alert(' Logged out (demo mode)');
+        window.location.reload();
+      }
+    }
+
+    window.onload = loadLeads;
+  </script>
+</body>
+</html>  
